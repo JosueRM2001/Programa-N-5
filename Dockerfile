@@ -1,12 +1,12 @@
-# Usa la imagen oficial de Nginx como base
+# # Use the official Nginx image as a base
 FROM nginx:alpine
 
-# Copia el archivo HTML al directorio del servidor web en el contenedor
+# Copy the HTML file to the web server directory in the container
 COPY ProgramWeb.html /usr/share/nginx/html/index.html
 
-# Expón el puerto 80 para el servidor web
+# Expose port 80 for the web server
 EXPOSE 80
 
-# Comando por defecto para ejecutar Nginx
+# Default command to run Nginx
 CMD ["nginx", "-g", "daemon off;"]
 
