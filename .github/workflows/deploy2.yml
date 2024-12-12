@@ -48,8 +48,7 @@ jobs:
 
             # Iniciar el nuevo contenedor
             sudo docker run -d --name my-app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/my-app:qa
-
- deploy_qa2:
+  deploy_qa2:
     name: Deploy to QA with Docker
     runs-on: ubuntu-latest
 
