@@ -1,7 +1,9 @@
 name: Deploy to QA with Docker
-
 on:
   push:
+    branches:
+      - qa
+  pull_request:
     branches:
       - qa
 
