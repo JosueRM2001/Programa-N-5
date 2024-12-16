@@ -1,18 +1,21 @@
-name: Deploy to QA with Docker
+name: Test Deploy pull request
 
 on:
-  push:
+  pull_request:
     branches:
-      - qa
+      - test
 
 jobs:
-  deploy_qa1:
-    name: Deploy to QA with Docker
+  update_docker_image:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the files
-        uses: actions/checkout@v2
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -21,73 +24,38 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/my-app:qa
+          tags: byvoxel/html_project:latest
 
-      - name: Deploy and run Docker container
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST_DNS }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Instalar Docker si no está disponible
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-
-            # Descargar la imagen desde Docker Hub
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/my-app:qa
-
-            # Detener y eliminar contenedores antiguos
-            sudo docker stop my-app || true
-            sudo docker rm my-app || true
-
-            # Iniciar el nuevo contenedor
-            sudo docker run -d --name my-app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/my-app:qa
-
-   deploy_qa2:
-    name: Deploy to QA with Docker
+  deploy:
+    name: Deploy Docker Container to EC2
     runs-on: ubuntu-latest
+    needs: update_docker_image
+
+    strategy:
+      matrix:
+        ec2_instance: 
+          - ec2-204-236-220-83.compute-1.amazonaws.com
+          - ec2-54-90-221-171.compute-1.amazonaws.com
 
     steps:
-      - name: Checkout the files
-        uses: actions/checkout@v2
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.6
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/my-app:qa
-
-      - name: Deploy and run Docker container
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST2_DNS }}
-          username: ${{ secrets.USERNAME }}
+          host: ${{ matrix.ec2_instance }}
+          username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
           script: |
-            # Instalar Docker si no está disponible
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-
-            # Descargar la imagen desde Docker Hub
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/my-app:qa
-
-            # Detener y eliminar contenedores antiguos
-            sudo docker stop my-app || true
-            sudo docker rm my-app || true
-
-            # Iniciar el nuevo contenedor
-            sudo docker run -d --name my-app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/my-app:qa
+            sudo docker stop html_project || true
+            sudo docker rm html_project || true
+            sudo docker pull byvoxel/html_project:latest
+            sudo docker run -d --name html_project -p 80:80 byvoxel/html_project:latest
